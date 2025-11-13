@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import ConnectionForm from "@/components/migration-wizard/ConnectionForm";
 import TableComparisonView from "@/components/migration-wizard/TableComparisonView";
+import RecordAnalysisView from "@/components/migration-wizard/RecordAnalysisView";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("setup");
@@ -14,6 +15,9 @@ export default function DashboardPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [recordAnalyzing, setRecordAnalyzing] = useState(false);
+  const [recordAnalysisResult, setRecordAnalysisResult] = useState<any>(null);
+  const [recordAnalysisError, setRecordAnalysisError] = useState<string | null>(null);
 
   const handleConnectionAdded = () => {
     setRefreshConnections((prev) => prev + 1);
@@ -41,6 +45,31 @@ export default function DashboardPage() {
       setAnalysisError(error instanceof Error ? error.message : "Failed to analyze databases");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleRecordAnalysis = async () => {
+    setRecordAnalyzing(true);
+    setRecordAnalysisError(null);
+    setRecordAnalysisResult(null);
+
+    try {
+      const response = await fetch("/api/analyze-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setRecordAnalysisResult(data.data);
+      } else {
+        setRecordAnalysisError(data.error || "Record analysis failed");
+      }
+    } catch (error) {
+      setRecordAnalysisError(error instanceof Error ? error.message : "Failed to analyze records");
+    } finally {
+      setRecordAnalyzing(false);
     }
   };
 
@@ -135,19 +164,61 @@ export default function DashboardPage() {
             <TabsContent value="export" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Data Export</CardTitle>
+                  <CardTitle>Record Compatibility Analysis</CardTitle>
                   <CardDescription>
-                    Export critical EE data to compressed JSON files
+                    Analyze tables with differences to identify CE-compatible vs EE-only records
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <Alert>
                     <AlertDescription>
-                      Export interface coming soon. This will allow you to export data from modules like helpdesk, subscriptions, documents, planning, etc.
+                      This analysis examines tables with compatible and incompatible differences to determine which records can be migrated to Odoo CE and which contain EE-only data.
                     </AlertDescription>
                   </Alert>
+
+                  <Button 
+                    onClick={handleRecordAnalysis} 
+                    disabled={recordAnalyzing || !analysisResult}
+                    className="w-full"
+                  >
+                    {recordAnalyzing ? "Analyzing records..." : "Analyze Record Compatibility"}
+                  </Button>
+
+                  {!analysisResult && (
+                    <Alert>
+                      <AlertDescription>
+                        Please run the table comparison analysis first (Setup tab).
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {recordAnalysisError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        ❌ {recordAnalysisError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {recordAnalyzing && (
+                    <div className="text-center space-y-2 py-8">
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Analyzing compatible tables...
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Analyzing incompatible tables...
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Identifying EE-only records...
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {recordAnalysisResult && (
+                <RecordAnalysisView analysis={recordAnalysisResult} />
+              )}
             </TabsContent>
 
             {/* Migrate Tab */}
