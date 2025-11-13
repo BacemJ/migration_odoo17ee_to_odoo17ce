@@ -134,22 +134,11 @@ async function getRecordCount(pool: Pool, tableName: string): Promise<number> {
  * Check if target table has all necessary columns from source
  */
 async function checkSchemaCompatibility(
+  sourceNonNullColumns: string[],
   sourcePool: Pool,
   targetPool: Pool,
   tableName: string
-): Promise<{ compatible: boolean; missingColumns: string[]; nullOnlyColumns: string[] }> {
-  // Get non-null columns from source (these are the required columns)
-  const sourceNonNullColumns = await getNonNullColumns(sourcePool, tableName);
-  
-  // Get all columns from source to identify null-only columns
-  const sourceAllColumns = await getTableColumns(sourcePool, tableName);
-  const sourceAllColumnNames = sourceAllColumns.map(c => c.columnName);
-  
-  // Identify null-only columns in source
-  const nullOnlyColumns = sourceAllColumnNames.filter(
-    col => !sourceNonNullColumns.includes(col)
-  );
-  
+): Promise<{ compatible: boolean; missingColumns: string[]; }> {
   // Get all columns from target
   const targetColumns = await getTableColumns(targetPool, tableName);
   const targetColumnNames = targetColumns.map(c => c.columnName);
@@ -161,9 +150,55 @@ async function checkSchemaCompatibility(
   
   return {
     compatible: missingColumns.length === 0,
-    missingColumns,
-    nullOnlyColumns,
+    missingColumns
   };
+}
+
+/**
+ * Check if all records are identical between source and target tables
+ * Compares records one by one using non-null columns
+ */
+async function areRecordsIdentical(
+  sourcePool: Pool,
+  targetPool: Pool,
+  tableName: string,
+  nonNullColumns: string[]
+): Promise<boolean> {
+  try {
+    // Build SELECT query with only non-null columns
+    const columnsList = nonNullColumns.map(col => `"${col}"`).join(', ');
+    const query = `SELECT ${columnsList} FROM "${tableName}" ORDER BY ${columnsList}`;
+
+    // Fetch all records from both databases
+    const sourceRecords = await executeQuery<Record<string, unknown>>(sourcePool, query);
+    const targetRecords = await executeQuery<Record<string, unknown>>(targetPool, query);
+
+    // Compare record by record
+    if (sourceRecords.length !== targetRecords.length) {
+      return false;
+    }
+
+    for (let i = 0; i < sourceRecords.length; i++) {
+      const sourceRecord = sourceRecords[i];
+      const targetRecord = targetRecords[i];
+
+      // Compare each non-null column value
+      for (const col of nonNullColumns) {
+        const sourceValue = sourceRecord[col];
+        const targetValue = targetRecord[col];
+
+        // Convert to string for comparison to handle different types
+        if (String(sourceValue) !== String(targetValue)) {
+          return false; // Found a difference
+        }
+      }
+    }
+
+    return true; // All records are identical
+  } catch (error) {
+    console.error(`Error comparing records for ${tableName}:`, error);
+    return false; // Assume not identical on error
+  }
 }
 
 /**
@@ -229,37 +264,17 @@ export async function compareTablesBetweenDatabases(
       
       // Table exists in target, get record count
       const targetCount = await getRecordCount(targetPool, tableName);
-      
-      // Check if record counts are identical
-      if (sourceCount === targetCount) {
-        tablesWithIdenticalRecords++;
-        tableDetails.push({
-          tableName,
-          category: 'identical_records',
-          sourceRecordCount: sourceCount,
-          targetRecordCount: targetCount,
-        });
-        continue;
-      }
-      
-      // Records differ, check schema compatibility
+      const sourceNonNullColumns = await getNonNullColumns(sourcePool, tableName);
+      // Check schema compatibility first
       const compatibility = await checkSchemaCompatibility(
+        sourceNonNullColumns,
         sourcePool,
         targetPool,
         tableName
       );
       
-      if (compatibility.compatible) {
-        tablesWithCompatibleDiff++;
-        tableDetails.push({
-          tableName,
-          category: 'compatible_diff',
-          sourceRecordCount: sourceCount,
-          targetRecordCount: targetCount,
-          missingColumns: [],
-          nullOnlyColumns: compatibility.nullOnlyColumns,
-        });
-      } else {
+      if (!compatibility.compatible) {
+        // Target lacks necessary columns
         tablesWithIncompatibleDiff++;
         tableDetails.push({
           tableName,
@@ -267,9 +282,42 @@ export async function compareTablesBetweenDatabases(
           sourceRecordCount: sourceCount,
           targetRecordCount: targetCount,
           missingColumns: compatibility.missingColumns,
-          nullOnlyColumns: compatibility.nullOnlyColumns,
         });
+        continue;
       }
+
+      // Schema is compatible, now check records
+      if (sourceCount === targetCount) {
+        // Counts match, verify all records are identical
+        
+        const recordsIdentical = await areRecordsIdentical(
+          sourcePool,
+          targetPool,
+          tableName,
+          sourceNonNullColumns
+        );
+
+        if (recordsIdentical) {
+          tablesWithIdenticalRecords++;
+          tableDetails.push({
+            tableName,
+            category: 'identical_records',
+            sourceRecordCount: sourceCount,
+            targetRecordCount: targetCount,
+          });
+          continue;
+        }
+      }
+
+      // Records differ but schema is compatible
+      tablesWithCompatibleDiff++;
+      tableDetails.push({
+        tableName,
+        category: 'compatible_diff',
+        sourceRecordCount: sourceCount,
+        targetRecordCount: targetCount,
+        missingColumns: [],
+      });      
     } catch (error) {
       console.error(`Error processing table ${tableName}:`, error);
     }

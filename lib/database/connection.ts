@@ -122,10 +122,10 @@ export async function testConnection(config: PoolConfig): Promise<{
 /**
  * Execute a query with automatic connection handling
  */
-export async function executeQuery<T = any>(
+export async function executeQuery<T = unknown>(
   pool: Pool,
   query: string,
-  params?: any[]
+  params?: unknown[]
 ): Promise<T[]> {
   const client = await pool.connect();
   try {
@@ -141,7 +141,7 @@ export async function executeQuery<T = any>(
  */
 export async function executeTransaction(
   pool: Pool,
-  queries: Array<{ query: string; params?: any[] }>
+  queries: Array<{ query: string; params?: unknown[] }>
 ): Promise<void> {
   const client = await pool.connect();
   try {
