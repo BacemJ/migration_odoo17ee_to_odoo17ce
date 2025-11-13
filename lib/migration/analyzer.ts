@@ -16,7 +16,7 @@ export interface AnalysisResult {
   ee_tables_found: Array<{
     table_name: string;
     row_count: number;
-    size_mb: number;
+    size_mb: string | number;
   }>;
   foreign_key_dependencies: Array<{
     table_name: string;
@@ -76,7 +76,7 @@ export async function analyzeSourceDatabase(
 
   const eeTables = await executeQuery<{
     table_name: string;
-    size_mb: number;
+    size_mb: string | number;
   }>(sourcePool, eeTablesQuery, [EE_TABLES, ...EE_TABLE_PATTERNS]);
 
   // 3. Get row counts for each table
@@ -84,7 +84,7 @@ export async function analyzeSourceDatabase(
   const tablesWithCounts: Array<{
     table_name: string;
     row_count: number;
-    size_mb: number;
+    size_mb: string | number;
   }> = [];
 
   for (const table of eeTables) {
@@ -159,7 +159,7 @@ export async function analyzeSourceDatabase(
 
   // 5. Calculate estimated export size
   const estimatedExportSize = tablesWithCounts.reduce(
-    (sum, table) => sum + table.size_mb,
+    (sum, table) => sum + parseFloat(String(table.size_mb)),
     0
   );
 

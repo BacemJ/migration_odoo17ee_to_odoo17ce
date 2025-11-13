@@ -6,13 +6,42 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import ConnectionForm from "@/components/migration-wizard/ConnectionForm";
+import TableComparisonView from "@/components/migration-wizard/TableComparisonView";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("setup");
   const [refreshConnections, setRefreshConnections] = useState(0);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const handleConnectionAdded = () => {
     setRefreshConnections((prev) => prev + 1);
+  };
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysisResult(null);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setAnalysisResult(data.data);
+      } else {
+        setAnalysisError(data.error || "Analysis failed");
+      }
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "Failed to analyze databases");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -59,19 +88,47 @@ export default function DashboardPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Database Analysis</CardTitle>
+                  <CardTitle>Database Analysis & Comparison</CardTitle>
                   <CardDescription>
-                    Analyze source EE database to identify modules and tables for migration
+                    Compare source and target databases to identify differences and compatibility
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Alert>
-                    <AlertDescription>
-                      Analysis interface coming soon. This will scan your source database and display detected EE modules, tables, and estimated export size.
-                    </AlertDescription>
-                  </Alert>
+                <CardContent className="space-y-4">
+                  <Button 
+                    onClick={handleAnalyze} 
+                    disabled={analyzing}
+                    className="w-full"
+                  >
+                    {analyzing ? "Analyzing databases..." : "Analyze & Compare Databases"}
+                  </Button>
+
+                  {analysisError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        ❌ {analysisError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {analyzing && (
+                    <div className="text-center space-y-2 py-8">
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Analyzing source tables...
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Comparing schemas...
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Checking compatibility...
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {analysisResult && analysisResult.comparison && (
+                <TableComparisonView comparison={analysisResult.comparison} />
+              )}
             </TabsContent>
 
             {/* Export Tab */}
