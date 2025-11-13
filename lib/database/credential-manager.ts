@@ -71,16 +71,29 @@ export async function saveConnection(data: {
  * Get all database connections
  */
 export async function getAllConnections(): Promise<
-  Omit<DatabaseConnection, 'encrypted_password'>[]
+  (Omit<DatabaseConnection, 'encrypted_password'> & { password: string })[]
 > {
   const pool = getConfigPool();
   const result = await executeQuery<DatabaseConnection>(
     pool,
-    `SELECT id, name, host, port, database, username, role, created_at, updated_at 
+    `SELECT id, name, host, port, database, username, encrypted_password, role, created_at, updated_at 
      FROM database_connections 
      ORDER BY role, name`
   );
-  return result;
+  
+  // Decrypt passwords for all connections
+  return result.map(conn => ({
+    id: conn.id,
+    name: conn.name,
+    host: conn.host,
+    port: conn.port,
+    database: conn.database,
+    username: conn.username,
+    password: decryptPassword(conn.encrypted_password),
+    role: conn.role,
+    created_at: conn.created_at,
+    updated_at: conn.updated_at,
+  }));
 }
 
 /**

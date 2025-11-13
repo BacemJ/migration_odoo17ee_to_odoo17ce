@@ -5,9 +5,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import ConnectionForm from "@/components/migration-wizard/ConnectionForm";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("setup");
+  const [refreshConnections, setRefreshConnections] = useState(0);
+
+  const handleConnectionAdded = () => {
+    setRefreshConnections((prev) => prev + 1);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
@@ -37,21 +43,19 @@ export default function DashboardPage() {
 
             {/* Setup Tab */}
             <TabsContent value="setup" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Database Connections</CardTitle>
-                  <CardDescription>
-                    Configure your source EE, staging, and target CE database connections
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Alert>
-                    <AlertDescription>
-                      Connection management UI coming soon. This will allow you to configure and test your three database connections.
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
+              <ConnectionForm 
+                role="source_ee"
+                title="Source Database (Odoo EE)"
+                description="Connect to your Odoo 17 Enterprise Edition database (read-only access)"
+                onConnectionAdded={handleConnectionAdded} 
+              />
+              
+              <ConnectionForm 
+                role="target_ce"
+                title="Target Database (Odoo CE)"
+                description="Connect to your Odoo 17 Community Edition database (will receive migrated data)"
+                onConnectionAdded={handleConnectionAdded} 
+              />
 
               <Card>
                 <CardHeader>
