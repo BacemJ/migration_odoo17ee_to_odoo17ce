@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getConfigPool, executeQuery, getOdooPool } from '@/lib/database/connection';
 import { getConnectionByRole, getConnectionWithPassword } from '@/lib/database/credential-manager';
-import { analyzeSourceDatabase, saveAnalysisResults } from '@/lib/migration/analyzer';
 import { compareTablesBetweenDatabases } from '@/lib/migration/table-comparator';
 
 /**
  * POST /api/analyze
- * Analyze and compare source EE and target CE databases
+ * Compare source EE and target CE databases
  */
 export async function POST() {
   try {
@@ -43,9 +42,6 @@ export async function POST() {
 
     const jobId = jobResult[0].id;
 
-    // Perform source analysis
-    const analysisResult = await analyzeSourceDatabase(sourceConnection.id);
-
     // Get connection configurations with passwords for pool creation
     const sourceConfig = await getConnectionWithPassword(sourceConnection.id);
     const targetConfig = await getConnectionWithPassword(targetConnection.id);
@@ -74,18 +70,11 @@ export async function POST() {
     // Perform table comparison
     const comparisonResult = await compareTablesBetweenDatabases(sourcePool, targetPool);
 
-    // Save analysis results with comparison data
+    // Save comparison results
     await executeQuery(
       configPool,
       `INSERT INTO analysis_results (
         job_id, 
-        ee_modules_found, 
-        ee_tables_found, 
-        foreign_key_dependencies,
-        record_counts,
-        estimated_export_size_mb,
-        risk_level,
-        warnings,
         tables_with_data,
         tables_missing_in_target,
         tables_with_identical_records,
@@ -93,16 +82,9 @@ export async function POST() {
         tables_with_incompatible_diff,
         table_comparison_details,
         comparison_completed_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
       [
         jobId,
-        JSON.stringify(analysisResult.ee_modules_found),
-        JSON.stringify(analysisResult.ee_tables_found),
-        JSON.stringify(analysisResult.foreign_key_dependencies),
-        JSON.stringify(analysisResult.record_counts),
-        analysisResult.estimated_export_size_mb,
-        analysisResult.risk_level,
-        JSON.stringify(analysisResult.warnings),
         comparisonResult.tablesWithData,
         comparisonResult.tablesMissingInTarget,
         comparisonResult.tablesWithIdenticalRecords,
@@ -123,7 +105,6 @@ export async function POST() {
       success: true,
       data: {
         job_id: jobId,
-        analysis: analysisResult,
         comparison: comparisonResult,
       },
     });
