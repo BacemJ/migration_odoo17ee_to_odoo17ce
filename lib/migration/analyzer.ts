@@ -1,4 +1,3 @@
-import { Pool } from 'pg';
 import {
   getOdooPool,
   getConnectionConfig,
@@ -105,7 +104,7 @@ export async function analyzeSourceDatabase(
           `Table ${table.table_name} has ${count.toLocaleString()} records - export may take significant time`
         );
       }
-    } catch (error) {
+    } catch {
       recordCounts[table.table_name] = 0;
       tablesWithCounts.push({
         ...table,
@@ -193,7 +192,7 @@ export async function analyzeSourceDatabase(
     if (cronCount > 0) {
       warnings.push(`Found ${cronCount} active cron jobs for EE modules`);
     }
-  } catch (error) {
+  } catch {
     // Ignore if query fails
   }
 
