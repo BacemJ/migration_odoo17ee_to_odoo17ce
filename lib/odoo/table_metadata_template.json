@@ -1,14 +1,13 @@
 {
-  "_comment": "CRITICAL TABLES REQUIRING EXAMINATION - Only these 28 tables need record-level analysis",
+  "_comment": "CRITICAL TABLES REQUIRING EXAMINATION - Only these 14 tables need record-level analysis. All other tables can be safely copied.",
   "_migration_strategy": {
     "tables_in_this_file": "Must be examined for EE-specific records. May require modification or deletion before migration.",
     "tables_not_in_this_file": "Can be safely copied/overwritten from source to target without compatibility issues.",
-    "total_critical_tables": 28,
+    "total_critical_tables": 14,
     "breakdown": {
       "critical_risk": 5,
       "high_risk": 5,
-      "medium_risk": 4,
-      "low_risk": 14
+      "medium_risk": 4
     }
   },
   
@@ -21,13 +20,13 @@
   },
 
   "_schema": {
-    "full_compatible_with_odoo_17_CE": "boolean - true if table structure exists in CE",
+    "full_compatible_with_odoo_17_CE": "boolean - true if table structure exists in CE, false if EE-only",
     "can_have_incompatible_records_in_columns": "boolean - true if records may contain EE-specific data",
-    "incompatibility_detection_method": "string - SQL/logic to detect problematic records, null if entire table is safe",
+    "incompatibility_detection_method": "string - SQL query to detect problematic records, null if entire table must be excluded",
     "have_business_data": "boolean - true if table contains user business data",
-    "table_role": "system|configuration|business|transactional|log|cache",
-    "risk_level": "low|medium|high|critical",
-    "migration_action": "examine|delete_ee_records|modify_records|safe_copy"
+    "table_role": "system|configuration|business",
+    "risk_level": "medium|high|critical",
+    "migration_action": "examine|delete_ee_records|modify_records"
   },
   
   "public.ir_module_module": {
@@ -129,17 +128,6 @@
     "notes": "MODIFY: Remove EE group memberships from res_groups_users_rel, keep user records"
   },
   
-  "public.res_users_settings": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": false,
-    "table_role": "configuration",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
   "public.res_config_settings": {
     "full_compatible_with_odoo_17_CE": true,
     "can_have_incompatible_records_in_columns": true,
@@ -228,72 +216,6 @@
     "notes": "ENTIRE TABLE INCOMPATIBLE - Export to JSON, DO NOT migrate"
   },
   
-  "public.res_partner": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "business",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.product_template": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "business",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.sale_order": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "transactional",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.account_move": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "transactional",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.account_journal": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "configuration",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.account_payment": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "transactional",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
   "public.delivery_carrier": {
     "full_compatible_with_odoo_17_CE": true,
     "can_have_incompatible_records_in_columns": true,
@@ -305,50 +227,6 @@
     "notes": "EXAMINE: EE-only carriers must be removed or switched to 'fixed' type"
   },
   
-  "public.mail_activity_plan": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": false,
-    "table_role": "configuration",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.mail_activity_type": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": false,
-    "table_role": "configuration",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.mail_compose_message": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": false,
-    "table_role": "cache",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is (transient data)"
-  },
-  
-  "public.payment_provider": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "configuration",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
   "public.pos_config": {
     "full_compatible_with_odoo_17_CE": true,
     "can_have_incompatible_records_in_columns": true,
@@ -358,93 +236,5 @@
     "risk_level": "medium",
     "migration_action": "modify_records",
     "notes": "MODIFY: Disable IoT/Restaurant features (set flags to false, null printer references)"
-  },
-  
-  "public.pos_order": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "transactional",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.product_attribute": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "configuration",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.product_product": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "business",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.product_supplierinfo": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "business",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.purchase_order": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "transactional",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.sale_order_line": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "transactional",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.stock_move_line": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": true,
-    "table_role": "transactional",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
-  },
-  
-  "public.stock_picking_type": {
-    "full_compatible_with_odoo_17_CE": true,
-    "can_have_incompatible_records_in_columns": false,
-    "incompatibility_detection_method": null,
-    "have_business_data": false,
-    "table_role": "configuration",
-    "risk_level": "low",
-    "migration_action": "safe_copy",
-    "notes": "Safe to copy as-is"
   }
 }
