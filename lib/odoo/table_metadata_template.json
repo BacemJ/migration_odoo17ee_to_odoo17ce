@@ -1,0 +1,450 @@
+{
+  "_comment": "CRITICAL TABLES REQUIRING EXAMINATION - Only these 28 tables need record-level analysis",
+  "_migration_strategy": {
+    "tables_in_this_file": "Must be examined for EE-specific records. May require modification or deletion before migration.",
+    "tables_not_in_this_file": "Can be safely copied/overwritten from source to target without compatibility issues.",
+    "total_critical_tables": 28,
+    "breakdown": {
+      "critical_risk": 5,
+      "high_risk": 5,
+      "medium_risk": 4,
+      "low_risk": 14
+    }
+  },
+  
+  "_workflow": {
+    "step_1": "Run table comparison to identify all tables",
+    "step_2": "For tables NOT in this JSON: Direct copy/overwrite is safe",
+    "step_3": "For tables IN this JSON: Run incompatibility_detection_method",
+    "step_4": "Modify/delete problematic records identified in step 3",
+    "step_5": "Copy cleaned tables to target"
+  },
+
+  "_schema": {
+    "full_compatible_with_odoo_17_CE": "boolean - true if table structure exists in CE",
+    "can_have_incompatible_records_in_columns": "boolean - true if records may contain EE-specific data",
+    "incompatibility_detection_method": "string - SQL/logic to detect problematic records, null if entire table is safe",
+    "have_business_data": "boolean - true if table contains user business data",
+    "table_role": "system|configuration|business|transactional|log|cache",
+    "risk_level": "low|medium|high|critical",
+    "migration_action": "examine|delete_ee_records|modify_records|safe_copy"
+  },
+  
+  "public.ir_module_module": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_module_module WHERE license = 'OEEL-1' OR name IN ('web_enterprise', 'web_studio', 'helpdesk', 'documents', 'planning', 'approvals', 'sign', 'voip', 'iot', 'quality_control', 'industry_fsm', 'social_marketing', 'sale_subscription')",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "critical",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE all EE module records or set state='uninstalled'"
+  },
+  
+  "public.ir_config_parameter": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_config_parameter WHERE key ILIKE '%enterprise%' OR key ILIKE '%studio%' OR key = 'web.base.url.freeze' OR key ILIKE 'database.enterprise_code'",
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "critical",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE EE-related configuration parameters"
+  },
+  
+  "public.ir_ui_view": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_ui_view WHERE arch_db::text ILIKE '%web_enterprise%' OR arch_db::text ILIKE '%web_studio%' OR arch_db::text ILIKE '%studio_approval%' OR arch_db::text ILIKE '%widget=\"web_ribbon\"%' OR key ILIKE '%.studio_%'",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "high",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE views with EE widgets or Studio customizations"
+  },
+  
+  "public.ir_asset": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_asset WHERE path ILIKE '%/web_enterprise/%' OR path ILIKE '%/web_studio/%' OR path ILIKE '%/theme_%_enterprise/%' OR path ILIKE '%enterprise.%'",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "high",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE EE asset references"
+  },
+  
+  "public.ir_attachment": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_attachment WHERE res_model IN ('helpdesk.ticket', 'documents.document', 'sign.request', 'planning.slot', 'approvals.approval') OR url ILIKE '%/web_enterprise/%'",
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "medium",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE attachments linked to EE-only models (data loss)"
+  },
+  
+  "public.ir_model_data": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_model_data WHERE module IN ('web_enterprise', 'web_studio', 'helpdesk', 'documents', 'planning', 'approvals', 'sign', 'voip', 'iot', 'quality_control', 'industry_fsm', 'social_marketing', 'sale_subscription')",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "critical",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE all external IDs belonging to EE modules"
+  },
+  
+  "public.ir_cron": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_cron WHERE model_id IN (SELECT id FROM ir_model WHERE model ILIKE '%helpdesk%' OR model ILIKE '%planning%' OR model ILIKE '%documents%' OR model ILIKE '%sign%' OR model ILIKE '%approvals%') OR code ILIKE '%env[%helpdesk%' OR code ILIKE '%env[%planning%'",
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "high",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE cron jobs referencing EE models"
+  },
+  
+  "public.mail_template": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM mail_template WHERE model IN ('helpdesk.ticket', 'documents.document', 'planning.slot', 'approvals.approval', 'sign.request') OR body_html::text ILIKE '%helpdesk%' OR body_html::text ILIKE '%planning%'",
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "medium",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE email templates for EE models"
+  },
+  
+  "public.res_users": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT u.id, u.login, STRING_AGG(g.name, ', ') as ee_groups FROM res_users u JOIN res_groups_users_rel r ON u.id = r.uid JOIN res_groups g ON r.gid = g.id WHERE g.name ILIKE '%helpdesk%' OR g.name ILIKE '%planning%' OR g.name ILIKE '%documents%' OR g.name ILIKE '%studio%' OR g.name ILIKE '%approvals%' OR g.name ILIKE '%sign%' OR g.name ILIKE '%quality%' OR g.category_id IN (SELECT id FROM ir_module_category WHERE name ILIKE '%enterprise%') GROUP BY u.id, u.login",
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "critical",
+    "migration_action": "modify_records",
+    "notes": "MODIFY: Remove EE group memberships from res_groups_users_rel, keep user records"
+  },
+  
+  "public.res_users_settings": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.res_config_settings": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM res_config_settings WHERE module_web_enterprise = true OR module_web_studio = true OR module_helpdesk = true OR module_documents = true OR module_planning = true OR group_studio_user_id IS NOT NULL",
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "high",
+    "migration_action": "modify_records",
+    "notes": "MODIFY: Set all module_* EE flags to false"
+  },
+  
+  "public.res_company": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM res_company WHERE font IN ('Lato', 'Roboto', 'Montserrat', 'Oswald', 'Raleway') OR external_report_layout_id IN (SELECT id FROM ir_ui_view WHERE key ILIKE '%enterprise%')",
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "medium",
+    "migration_action": "modify_records",
+    "notes": "MODIFY: Reset font to CE-compatible option, null external_report_layout_id if EE"
+  },
+  
+  "public.website": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT w.* FROM website w WHERE theme_id IN (SELECT id FROM ir_module_module WHERE name ILIKE 'theme_%_enterprise' OR name IN ('theme_odoo_experts', 'theme_loftspace', 'theme_graphene')) OR w.id IN (SELECT res_id FROM ir_model_data WHERE model = 'website' AND module IN ('website_studio', 'web_studio'))",
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "high",
+    "migration_action": "modify_records",
+    "notes": "MODIFY: Switch theme_id to CE-compatible theme (theme_default)"
+  },
+  
+  "public.ir_act_server": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_act_server WHERE model_id IN (SELECT id FROM ir_model WHERE model IN ('helpdesk.ticket', 'documents.document', 'planning.slot', 'approvals.approval', 'sign.request')) OR code ILIKE '%helpdesk%' OR code ILIKE '%documents%' OR code ILIKE '%planning%' OR code ILIKE '%studio%'",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "high",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE automated actions for EE models"
+  },
+  
+  "public.ir_ui_menu": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT m.* FROM ir_ui_menu m JOIN ir_model_data d ON d.res_id = m.id AND d.model = 'ir.ui.menu' WHERE d.module IN ('web_enterprise', 'web_studio', 'helpdesk', 'documents', 'planning', 'approvals', 'sign', 'voip', 'iot', 'quality_control', 'industry_fsm', 'sale_subscription')",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "high",
+    "migration_action": "delete_ee_records",
+    "notes": "DELETE menu items for EE modules"
+  },
+  
+  "public.helpdesk_team": {
+    "full_compatible_with_odoo_17_CE": false,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "critical",
+    "migration_action": "examine",
+    "notes": "ENTIRE TABLE INCOMPATIBLE - Export to JSON, DO NOT migrate"
+  },
+  
+  "public.documents_document": {
+    "full_compatible_with_odoo_17_CE": false,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "critical",
+    "migration_action": "examine",
+    "notes": "ENTIRE TABLE INCOMPATIBLE - Export to JSON, DO NOT migrate"
+  },
+  
+  "public.planning_slot": {
+    "full_compatible_with_odoo_17_CE": false,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "critical",
+    "migration_action": "examine",
+    "notes": "ENTIRE TABLE INCOMPATIBLE - Export to JSON, DO NOT migrate"
+  },
+  
+  "public.res_partner": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.product_template": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.sale_order": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.account_move": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.account_journal": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.account_payment": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.delivery_carrier": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM delivery_carrier WHERE delivery_type IN ('bpost', 'easypost', 'fedex', 'ups', 'usps', 'dhl')",
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "medium",
+    "migration_action": "examine",
+    "notes": "EXAMINE: EE-only carriers must be removed or switched to 'fixed' type"
+  },
+  
+  "public.mail_activity_plan": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.mail_activity_type": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.mail_compose_message": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "cache",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is (transient data)"
+  },
+  
+  "public.payment_provider": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.pos_config": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM pos_config WHERE iface_tipproduct = true OR module_pos_restaurant = true OR iface_printer_id IS NOT NULL",
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "medium",
+    "migration_action": "modify_records",
+    "notes": "MODIFY: Disable IoT/Restaurant features (set flags to false, null printer references)"
+  },
+  
+  "public.pos_order": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.product_attribute": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.product_product": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.product_supplierinfo": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.purchase_order": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.sale_order_line": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.stock_move_line": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  },
+  
+  "public.stock_picking_type": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "migration_action": "safe_copy",
+    "notes": "Safe to copy as-is"
+  }
+}

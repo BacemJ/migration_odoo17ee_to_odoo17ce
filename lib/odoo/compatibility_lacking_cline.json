@@ -1,0 +1,281 @@
+{
+  "public.account_journal": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "notes": "Accounting journals are fully compatible. No EE-specific fields used in standard journals."
+  },
+  
+  "public.account_move": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "notes": "Journal entries (invoices, bills, payments) are fully compatible. Core accounting functionality."
+  },
+  
+  "public.account_payment": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "notes": "Payment records are fully compatible. Standard payment processing exists in CE."
+  },
+  
+  "public.delivery_carrier": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM delivery_carrier WHERE delivery_type IN ('bpost', 'easypost', 'fedex', 'ups', 'usps', 'dhl') OR product_id IN (SELECT id FROM product_product WHERE product_tmpl_id IN (SELECT id FROM product_template WHERE name ILIKE '%enterprise%'))",
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "medium",
+    "notes": "Some delivery integrations are EE-only (FedEx, UPS, DHL, Easypost). Check delivery_type field. Basic fixed/based_on_rule carriers are CE compatible."
+  },
+  
+  "public.ir_act_server": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_act_server WHERE model_id IN (SELECT id FROM ir_model WHERE model IN ('helpdesk.ticket', 'documents.document', 'planning.slot', 'approvals.approval', 'sign.request')) OR code ILIKE '%helpdesk%' OR code ILIKE '%documents%' OR code ILIKE '%planning%' OR code ILIKE '%studio%'",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "high",
+    "notes": "Automated actions may reference EE models or Studio customizations. Check model_id and code fields for EE module references."
+  },
+  
+  "public.ir_model_data": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM ir_model_data WHERE module IN ('web_enterprise', 'web_studio', 'helpdesk', 'helpdesk_*', 'documents', 'documents_*', 'planning', 'approvals', 'sign', 'voip', 'iot', 'quality_control', 'quality_*', 'industry_fsm', 'social_*', 'sale_subscription', 'website_studio', 'theme_*_enterprise')",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "critical",
+    "notes": "CRITICAL: External IDs for EE modules must be cleaned before migration. This table maps XML IDs to database records."
+  },
+  
+  "public.ir_ui_menu": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT m.* FROM ir_ui_menu m JOIN ir_model_data d ON d.res_id = m.id AND d.model = 'ir.ui.menu' WHERE d.module IN ('web_enterprise', 'web_studio', 'helpdesk', 'documents', 'planning', 'approvals', 'sign', 'voip', 'iot', 'quality_control', 'industry_fsm', 'sale_subscription')",
+    "have_business_data": false,
+    "table_role": "system",
+    "risk_level": "high",
+    "notes": "Menu items for EE modules will cause errors. Check via ir_model_data for module ownership."
+  },
+  
+  "public.mail_activity_plan": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "notes": "Activity plan templates are available in CE. Fully compatible."
+  },
+  
+  "public.mail_activity_type": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "notes": "Activity types are CE compatible. Standard activity types work in both editions."
+  },
+  
+  "public.mail_compose_message": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "cache",
+    "risk_level": "low",
+    "notes": "Transient model for composing emails. Can be safely cleared or migrated."
+  },
+  
+  "public.payment_provider": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "notes": "Payment providers are CE compatible. Stripe, PayPal, Authorize.net, etc. work in CE."
+  },
+  
+  "public.pos_config": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM pos_config WHERE iface_tipproduct = true OR module_pos_restaurant = true OR iface_printer_id IS NOT NULL",
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "medium",
+    "notes": "Basic PoS is CE compatible, but IoT features (printers, customer displays) and Restaurant module are EE-only. Check hardware/restaurant related fields."
+  },
+  
+  "public.pos_order": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "notes": "PoS orders are fully compatible. Transaction data migrates cleanly."
+  },
+  
+  "public.product_attribute": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "notes": "Product attributes (color, size, etc.) are CE compatible."
+  },
+  
+  "public.product_product": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "notes": "Product variants are fully compatible. Core business data."
+  },
+  
+  "public.product_supplierinfo": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "notes": "Vendor pricelist information is CE compatible."
+  },
+  
+  "public.product_template": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "notes": "Product templates are fully compatible. Core business data."
+  },
+  
+  "public.purchase_order": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "notes": "Purchase orders are fully compatible. Standard procurement functionality."
+  },
+  
+  "public.res_company": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM res_company WHERE font IN ('Lato', 'Roboto', 'Montserrat', 'Oswald', 'Raleway') OR external_report_layout_id IN (SELECT id FROM ir_ui_view WHERE key ILIKE '%enterprise%')",
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "medium",
+    "notes": "Company settings may reference EE report layouts or fonts. Check font and external_report_layout_id fields."
+  },
+  
+  "public.res_config_settings": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT * FROM res_config_settings WHERE module_web_enterprise = true OR module_web_studio = true OR module_helpdesk = true OR module_documents = true OR module_planning = true OR group_studio_user_id IS NOT NULL",
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "high",
+    "notes": "CRITICAL: Transient settings model may have EE module flags enabled. Check all module_* and group_* fields for EE references."
+  },
+  
+  "public.res_partner": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "low",
+    "notes": "Contacts/customers/vendors are fully compatible. Core business data."
+  },
+  
+  "public.res_users": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT u.id, u.login, STRING_AGG(g.name, ', ') as ee_groups FROM res_users u JOIN res_groups_users_rel r ON u.id = r.uid JOIN res_groups g ON r.gid = g.id WHERE g.name ILIKE '%helpdesk%' OR g.name ILIKE '%planning%' OR g.name ILIKE '%documents%' OR g.name ILIKE '%studio%' OR g.name ILIKE '%approvals%' OR g.name ILIKE '%sign%' OR g.name ILIKE '%quality%' OR g.category_id IN (SELECT id FROM ir_module_category WHERE name ILIKE '%enterprise%') GROUP BY u.id, u.login",
+    "have_business_data": true,
+    "table_role": "business",
+    "risk_level": "high",
+    "notes": "CRITICAL: Users may have EE-only group memberships that will cause login errors. Must remove EE group assignments via res_groups_users_rel."
+  },
+  
+  "public.res_users_settings": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "notes": "User preferences are CE compatible. Personal settings migrate cleanly."
+  },
+  
+  "public.sale_order": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "notes": "Sales orders are fully compatible. Core sales functionality. Note: Subscriptions (sale_subscription module) are EE-only but standard orders are fine."
+  },
+  
+  "public.sale_order_line": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "notes": "Sale order lines are fully compatible. Transaction line items migrate cleanly."
+  },
+  
+  "public.stock_move_line": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": true,
+    "table_role": "transactional",
+    "risk_level": "low",
+    "notes": "Stock move lines (detailed operations) are CE compatible. Inventory tracking works in CE."
+  },
+  
+  "public.stock_picking_type": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": false,
+    "incompatibility_detection_method": null,
+    "have_business_data": false,
+    "table_role": "configuration",
+    "risk_level": "low",
+    "notes": "Operation types (receipts, deliveries, internal transfers) are CE compatible."
+  },
+  
+  "public.website": {
+    "full_compatible_with_odoo_17_CE": true,
+    "can_have_incompatible_records_in_columns": true,
+    "incompatibility_detection_method": "SELECT w.* FROM website w WHERE theme_id IN (SELECT id FROM ir_module_module WHERE name ILIKE 'theme_%_enterprise' OR name IN ('theme_odoo_experts', 'theme_loftspace', 'theme_graphene')) OR w.id IN (SELECT res_id FROM ir_model_data WHERE model = 'website' AND module IN ('website_studio', 'web_studio'))",
+    "have_business_data": true,
+    "table_role": "configuration",
+    "risk_level": "high",
+    "notes": "CRITICAL: Websites may use EE-only themes or Studio customizations. Check theme_id for enterprise themes. Common EE themes: theme_odoo_experts, theme_loftspace, theme_graphene."
+  }
+}
