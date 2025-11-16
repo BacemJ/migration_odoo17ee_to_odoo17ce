@@ -1,14 +1,19 @@
 "use client";
 
+import IncompatibleFieldsView, { FieldDataLossAnalysis, IncompatibleFieldsSummary } from "@/components/migration-wizard/IncompatibleFieldsView";
+
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
 import ConnectionForm from "@/components/migration-wizard/ConnectionForm";
+
 import TableComparisonView from "@/components/migration-wizard/TableComparisonView";
 import RecordAnalysisView from "@/components/migration-wizard/RecordAnalysisView";
+
 
 interface TableDetail {
   tableName: string;
@@ -87,6 +92,7 @@ interface RecordAnalysisResult {
   };
 }
 
+
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("setup");
   const [analyzing, setAnalyzing] = useState(false);
@@ -99,12 +105,103 @@ export default function DashboardPage() {
   const [missingTablesResult, setMissingTablesResult] = useState<MissingTablesResult | null>(null);
   const [missingTablesError, setMissingTablesError] = useState<string | null>(null);
   const [expandedTable, setExpandedTable] = useState<string | null>(null);
+  const [sourceConnectionId, setSourceConnectionId] = useState<number | null>(null);
+  const [targetConnectionId, setTargetConnectionId] = useState<number | null>(null);
+
+  // Step 2: Incompatible Fields Analysis state and handler (must be inside component)
+  const [incompatibleFieldsAnalyzing, setIncompatibleFieldsAnalyzing] = useState(false);
+  const [incompatibleFieldsResult, setIncompatibleFieldsResult] = useState<{
+    analysis: FieldDataLossAnalysis[];
+    summary: IncompatibleFieldsSummary;
+  } | null>(null);
+  const [incompatibleFieldsError, setIncompatibleFieldsError] = useState<string | null>(null);
+
+  const handleIncompatibleFieldsAnalysis = async () => {
+    setIncompatibleFieldsAnalyzing(true);
+    setIncompatibleFieldsError(null);
+    setIncompatibleFieldsResult(null);
+
+    try {
+      // Always fetch the latest analysis result from the backend
+      const analysisRes = await fetch("/api/analyze?latest=true");
+      const analysisData = await analysisRes.json();
+      const latestAnalysis = analysisData?.data;
+
+      // Debug logging
+      console.log('Analysis data:', analysisData);
+      console.log('Latest analysis:', latestAnalysis);
+      console.log('Source connection ID:', sourceConnectionId);
+      console.log('Target connection ID:', targetConnectionId);
+      console.log('Table details:', latestAnalysis?.comparison?.tableDetails);
+
+      // Detailed error checking
+      if (!latestAnalysis) {
+        setIncompatibleFieldsError("No analysis results found. Please run table comparison first (Setup tab).");
+        setIncompatibleFieldsAnalyzing(false);
+        return;
+      }
+
+      if (!latestAnalysis.comparison) {
+        setIncompatibleFieldsError("Analysis comparison data is missing. Please run table comparison again.");
+        setIncompatibleFieldsAnalyzing(false);
+        return;
+      }
+
+      if (!latestAnalysis.comparison.tableDetails || !Array.isArray(latestAnalysis.comparison.tableDetails)) {
+        setIncompatibleFieldsError("Table details are missing or invalid. Please run table comparison again.");
+        setIncompatibleFieldsAnalyzing(false);
+        return;
+      }
+
+      if (!sourceConnectionId || !targetConnectionId) {
+        setIncompatibleFieldsError("Database connections are not configured. Please set up connections in the Setup tab.");
+        setIncompatibleFieldsAnalyzing(false);
+        return;
+      }
+
+      // Get tables with incompatible differences and their missing columns
+      const incompatibleTables = latestAnalysis.comparison.tableDetails
+        .filter((t: TableDetail) => t.category === 'incompatible_diff' && t.missingColumns && t.missingColumns.length > 0)
+        .map((t: TableDetail) => ({
+          tableName: t.tableName,
+          missingColumns: t.missingColumns || [],
+        }));
+
+      if (incompatibleTables.length === 0) {
+        setIncompatibleFieldsError("No tables with incompatible fields found.");
+        setIncompatibleFieldsAnalyzing(false);
+        return;
+      }
+
+      // Call the API
+      const params = new URLSearchParams({
+        sourceId: String(sourceConnectionId),
+        targetId: String(targetConnectionId),
+        incompatibleTables: JSON.stringify(incompatibleTables),
+      });
+      const response = await fetch(`/api/deep-analysis/incompatible-fields?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setIncompatibleFieldsResult({
+          analysis: data.analysis,
+          summary: data.summary,
+        });
+      } else {
+        setIncompatibleFieldsError(data.error || "Incompatible fields analysis failed");
+      }
+    } catch (error) {
+      setIncompatibleFieldsError(error instanceof Error ? error.message : "Failed to analyze incompatible fields");
+    } finally {
+      setIncompatibleFieldsAnalyzing(false);
+    }
+  };
 
   const handleConnectionAdded = () => {
     // Connection added callback - triggers re-render of connection forms
   };
 
-  // Load last analysis results on component mount
+  // Load last analysis results and connection IDs on component mount
   useEffect(() => {
     const loadLastAnalysis = async () => {
       try {
@@ -120,7 +217,30 @@ export default function DashboardPage() {
       }
     };
 
+    const loadConnectionIds = async () => {
+      try {
+        const response = await fetch("/api/connections");
+        const data = await response.json();
+        
+        console.log("Connections API response:", data);
+        
+        if (data.success && data.data) {
+          const sourceConn = data.data.find((c: { role: string }) => c.role === 'source_ee');
+          const targetConn = data.data.find((c: { role: string }) => c.role === 'target_ce');
+          
+          console.log("Source connection:", sourceConn);
+          console.log("Target connection:", targetConn);
+          
+          if (sourceConn) setSourceConnectionId(sourceConn.id);
+          if (targetConn) setTargetConnectionId(targetConn.id);
+        }
+      } catch (error) {
+        console.error("Failed to load connection IDs:", error);
+      }
+    };
+
     loadLastAnalysis();
+    loadConnectionIds();
   }, []);
 
   const handleAnalyze = async () => {
@@ -209,7 +329,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header */}
@@ -302,6 +422,8 @@ export default function DashboardPage() {
                       tablesWithIncompatibleDiff: typeof analysisResult.comparison.tablesWithIncompatibleDiff === "number" ? analysisResult.comparison.tablesWithIncompatibleDiff : 0,
                       tableDetails: Array.isArray(analysisResult.comparison.tableDetails) ? analysisResult.comparison.tableDetails : [],
                     }}
+                    sourceId={sourceConnectionId || undefined}
+                    targetId={targetConnectionId || undefined}
                   />
                 )}
             </TabsContent>
@@ -570,6 +692,71 @@ export default function DashboardPage() {
                   )}
                 </>
               )}
+
+              {/* Step 2: Incompatible Fields Analysis */}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Step 2: Incompatible Fields Analysis</CardTitle>
+                  <CardDescription>
+                    Analyze data loss in fields that exist in EE but not in CE (for tables that exist in both)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Alert className="bg-orange-50 border-orange-200">
+                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-800">
+                      <strong>Warning:</strong> Some tables exist in both EE and CE but have additional fields in EE. Data in these EE-only fields will be lost during migration.
+                    </AlertDescription>
+                  </Alert>
+
+                  {!analysisResult && (
+                    <Alert>
+                      <AlertDescription>
+                        Please run the table comparison analysis first (Setup tab).
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {analysisResult && (
+                    <>
+                      <Button
+                        onClick={handleIncompatibleFieldsAnalysis}
+                        disabled={incompatibleFieldsAnalyzing}
+                        className="w-full"
+                      >
+                        {incompatibleFieldsAnalyzing ? "Analyzing incompatible fields..." : "Analyze Incompatible Fields & Preview Data"}
+                      </Button>
+
+                      {incompatibleFieldsError && (
+                        <Alert variant="destructive">
+                          <AlertDescription>
+                            ❌ {incompatibleFieldsError}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {incompatibleFieldsAnalyzing && (
+                        <div className="text-center space-y-2 py-8">
+                          <div className="text-sm text-muted-foreground">
+                            ⏳ Grouping tables by business/config/technical...
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            ⏳ Extracting sample records and field data loss...
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {incompatibleFieldsResult && (
+                    <IncompatibleFieldsView
+                      analysis={incompatibleFieldsResult.analysis}
+                      summary={incompatibleFieldsResult.summary}
+                    />
+                  )}
+                </CardContent>
+              </Card>
 
             </TabsContent>
 

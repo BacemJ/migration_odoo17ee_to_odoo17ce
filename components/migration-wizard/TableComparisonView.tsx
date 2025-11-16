@@ -24,9 +24,12 @@ interface TableComparisonResult {
 
 interface TableComparisonViewProps {
   comparison: TableComparisonResult;
+  sourceId?: number;
+  targetId?: number;
+  showOnlyIncompatible?: boolean;
 }
 
-export default function TableComparisonView({ comparison }: TableComparisonViewProps) {
+export default function TableComparisonView({ comparison, showOnlyIncompatible = false }: TableComparisonViewProps) {
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'identical_records':
@@ -48,12 +51,14 @@ export default function TableComparisonView({ comparison }: TableComparisonViewP
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Database Comparison Results</CardTitle>
-        <CardDescription>
-          Side-by-side comparison of source (Odoo EE) and target (Odoo CE) databases
-        </CardDescription>
-      </CardHeader>
+      {!showOnlyIncompatible && (
+        <CardHeader>
+          <CardTitle>Database Comparison Results</CardTitle>
+          <CardDescription>
+            Side-by-side comparison of source (Odoo EE) and target (Odoo CE) databases
+          </CardDescription>
+        </CardHeader>
+      )}
       <CardContent className="space-y-6">
         {/* Summary Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
