@@ -284,53 +284,75 @@ export default function IncompatibleFieldsView({ analysis, summary }: Incompatib
                           
                           {showSampleData[table.tableName] && (
                             <div className="overflow-x-auto border rounded-lg">
+                              <Alert className="mb-3 bg-red-50 border-red-200">
+                                <AlertTriangle className="h-4 w-4 text-red-600" />
+                                <AlertDescription className="text-sm text-red-800">
+                                  <strong>Red highlighted columns</strong> will be lost during migration (missing in CE)
+                                </AlertDescription>
+                              </Alert>
                               <table className="w-full text-sm">
                                 <thead className="bg-gray-50">
                                   <tr>
-                                    {Object.keys(table.sampleRecords[0] || {})
-                                      .filter(key => key !== '_missingInCE')
-                                      .slice(0, 8) // Limit columns for display
-                                      .map(key => (
+                                    {(() => {
+                                      // Get all columns including missing ones
+                                      const allColumns = Object.keys(table.sampleRecords[0] || {})
+                                        .filter(key => key !== '_missingInCE');
+                                      const missingCols = table.sampleRecords[0]._missingInCE || [];
+                                      
+                                      // Show missing columns first, then regular columns
+                                      const sortedColumns = [
+                                        ...allColumns.filter(col => missingCols.includes(col)),
+                                        ...allColumns.filter(col => !missingCols.includes(col))
+                                      ];
+                                      
+                                      return sortedColumns.map(key => (
                                         <th 
                                           key={key}
-                                          className={`px-3 py-2 text-left font-semibold ${
-                                            table.sampleRecords[0]._missingInCE?.includes(key)
-                                              ? 'bg-red-100 text-red-700'
-                                              : ''
+                                          className={`px-3 py-2 text-left font-semibold border-r ${
+                                            missingCols.includes(key)
+                                              ? 'bg-red-100 text-red-700 border-red-300'
+                                              : 'bg-gray-50'
                                           }`}
                                         >
                                           <div className="flex items-center gap-1">
-                                            {key}
-                                            {table.sampleRecords[0]._missingInCE?.includes(key) && (
-                                              <AlertTriangle className="h-3 w-3" />
+                                            {missingCols.includes(key) && (
+                                              <AlertTriangle className="h-3 w-3 shrink-0" />
                                             )}
+                                            <span className="font-mono text-xs">{key}</span>
                                           </div>
                                         </th>
-                                      ))}
+                                      ));
+                                    })()}
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {table.sampleRecords.map((record, idx) => (
-                                    <tr key={idx} className="border-t hover:bg-gray-50">
-                                      {Object.entries(record)
-                                        .filter(([key]) => key !== '_missingInCE')
-                                        .slice(0, 8)
-                                        .map(([key, value]) => (
+                                  {table.sampleRecords.map((record, idx) => {
+                                    const allColumns = Object.keys(record).filter(key => key !== '_missingInCE');
+                                    const missingCols = record._missingInCE || [];
+                                    const sortedColumns = [
+                                      ...allColumns.filter(col => missingCols.includes(col)),
+                                      ...allColumns.filter(col => !missingCols.includes(col))
+                                    ];
+                                    
+                                    return (
+                                      <tr key={idx} className="border-t hover:bg-gray-50">
+                                        {sortedColumns.map((key) => (
                                           <td 
                                             key={key}
-                                            className={`px-3 py-2 ${
-                                              record._missingInCE?.includes(key)
-                                                ? 'bg-red-50 font-semibold'
+                                            className={`px-3 py-2 border-r ${
+                                              missingCols.includes(key)
+                                                ? 'bg-red-50 font-semibold border-red-200'
                                                 : ''
                                             }`}
                                           >
                                             <code className="text-xs">
-                                              {formatValue(value)}
+                                              {formatValue(record[key])}
                                             </code>
                                           </td>
                                         ))}
-                                    </tr>
-                                  ))}
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
