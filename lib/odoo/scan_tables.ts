@@ -1,4 +1,4 @@
-{
+const scanTables = {
     "public.ir_module_module": {
     "full_compatible_with_odoo_17_CE": true,
     "can_have_incompatible_records_in_columns": true,
@@ -207,4 +207,6 @@
     "migration_action": "modify_records",
     "notes": "MODIFY: Disable IoT/Restaurant features (set flags to false, null printer references)"
   }
-}
+};
+
+export default scanTables;
