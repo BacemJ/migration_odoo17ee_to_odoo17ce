@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import { getOdooPool, executeQuery, getConnectionConfig } from '@/lib/database/connection';
+import { getOdooPool, executeQuery, getConnectionConfig, getConnectionConfigByName } from '@/lib/database/connection';
 
 interface TableDataType {
   category: 'business_data' | 'system_configuration' | 'application_configuration' | 'technical';
@@ -234,12 +234,12 @@ async function getSampleRecordsWithDataLoss(
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const sourceId = searchParams.get('sourceId');
-    const targetId = searchParams.get('targetId');
+    const sourceName = searchParams.get('sourceName');
+    const targetName = searchParams.get('targetName');
     
-    if (!sourceId || !targetId) {
+    if (!sourceName || !targetName) {
       return NextResponse.json(
-        { error: 'Missing sourceId or targetId parameter' },
+        { error: 'Missing sourceName or targetName parameter' },
         { status: 400 }
       );
     }
@@ -256,8 +256,8 @@ export async function GET(request: NextRequest) {
     const incompatibleTables = JSON.parse(incompatibleTablesParam);
     
     // Get source database connection
-    const sourceConfig = await getConnectionConfig(parseInt(sourceId));
-    const sourcePool = getOdooPool(`source_${sourceId}`, sourceConfig);
+    const sourceConfig = await getConnectionConfigByName(sourceName);
+    const sourcePool = getOdooPool(`source_${sourceName}`, sourceConfig);
 
     const results: FieldDataLossAnalysis[] = [];
 

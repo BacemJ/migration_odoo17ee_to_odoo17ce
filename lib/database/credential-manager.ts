@@ -1,7 +1,5 @@
 import {
   getConfigPool,
-  encryptPassword,
-  decryptPassword,
   testConnection,
   executeQuery,
   DatabaseConnection,
@@ -22,10 +20,9 @@ export async function saveConnection(data: {
   role: 'source_ee' | 'staging' | 'target_ce';
 }): Promise<DatabaseConnection> {
   const pool = getConfigPool();
-  const encryptedPassword = encryptPassword(data.password);
 
+  // If id provided, update by id (still allowed)
   if (data.id) {
-    // Update existing connection
     const result = await executeQuery<DatabaseConnection>(
       pool,
       `UPDATE database_connections 
@@ -39,32 +36,40 @@ export async function saveConnection(data: {
         data.port,
         data.database,
         data.username,
-        encryptedPassword,
+        data.password,
         data.role,
         data.id,
       ]
     );
     return result[0];
-  } else {
-    // Create new connection
-    const result = await executeQuery<DatabaseConnection>(
-      pool,
-      `INSERT INTO database_connections 
-       (name, host, port, database, username, encrypted_password, role)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [
-        data.name,
-        data.host,
-        data.port,
-        data.database,
-        data.username,
-        encryptedPassword,
-        data.role,
-      ]
-    );
-    return result[0];
   }
+
+  // Upsert by unique name (name is constant per role/environment)
+  const result = await executeQuery<DatabaseConnection>(
+    pool,
+    `INSERT INTO database_connections 
+     (name, host, port, database, username, encrypted_password, role)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (name)
+     DO UPDATE SET host = EXCLUDED.host,
+                   port = EXCLUDED.port,
+                   database = EXCLUDED.database,
+                   username = EXCLUDED.username,
+                   encrypted_password = EXCLUDED.encrypted_password,
+                   role = EXCLUDED.role,
+                   updated_at = CURRENT_TIMESTAMP
+     RETURNING *`,
+    [
+      data.name,
+      data.host,
+      data.port,
+      data.database,
+      data.username,
+      data.password,
+      data.role,
+    ]
+  );
+  return result[0];
 }
 
 /**
@@ -81,7 +86,7 @@ export async function getAllConnections(): Promise<
      ORDER BY role, name`
   );
   
-  // Decrypt passwords for all connections
+  // Return plain password (no encryption)
   return result.map(conn => ({
     id: conn.id,
     name: conn.name,
@@ -89,7 +94,7 @@ export async function getAllConnections(): Promise<
     port: conn.port,
     database: conn.database,
     username: conn.username,
-    password: decryptPassword(conn.encrypted_password),
+    password: conn.encrypted_password,
     role: conn.role,
     created_at: conn.created_at,
     updated_at: conn.updated_at,
@@ -185,11 +190,7 @@ export async function getConnectionWithPassword(
     return null;
   }
 
-  const conn = result[0];
-  return {
-    ...conn,
-    encrypted_password: decryptPassword(conn.encrypted_password),
-  };
+   return result[0];
 }
 
 /**

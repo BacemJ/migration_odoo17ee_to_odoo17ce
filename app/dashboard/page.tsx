@@ -1,6 +1,7 @@
 "use client";
 
 import IncompatibleFieldsView, { FieldDataLossAnalysis, IncompatibleFieldsSummary } from "@/components/migration-wizard/IncompatibleFieldsView";
+import { EEAnalysisView } from "@/components/migration-wizard/EEAnalysisView";
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -107,6 +108,8 @@ export default function DashboardPage() {
   const [expandedTable, setExpandedTable] = useState<string | null>(null);
   const [sourceConnectionId, setSourceConnectionId] = useState<number | null>(null);
   const [targetConnectionId, setTargetConnectionId] = useState<number | null>(null);
+  const [sourceConnectionName, setSourceConnectionName] = useState<string | null>(null);
+  const [targetConnectionName, setTargetConnectionName] = useState<string | null>(null);
 
   // Step 2: Incompatible Fields Analysis state and handler (must be inside component)
   const [incompatibleFieldsAnalyzing, setIncompatibleFieldsAnalyzing] = useState(false);
@@ -115,6 +118,43 @@ export default function DashboardPage() {
     summary: IncompatibleFieldsSummary;
   } | null>(null);
   const [incompatibleFieldsError, setIncompatibleFieldsError] = useState<string | null>(null);
+
+  // EE Analysis state
+  const [eeAnalyzing, setEEAnalyzing] = useState(false);
+  const [eeAnalysisResult, setEEAnalysisResult] = useState<any>(null);
+  const [eeAnalysisError, setEEAnalysisError] = useState<string | null>(null);
+
+  const handleEEAnalysis = async () => {
+    setEEAnalyzing(true);
+    setEEAnalysisError(null);
+    setEEAnalysisResult(null);
+
+    try {
+      if (!sourceConnectionName) {
+        setEEAnalysisError("Source database connection (name) is not configured. Please set up connections in the Setup tab.");
+        setEEAnalyzing(false);
+        return;
+      }
+
+      const response = await fetch('/api/ee-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionName: sourceConnectionName }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setEEAnalysisResult(data.data);
+      } else {
+        setEEAnalysisError(data.error || "EE analysis failed");
+      }
+    } catch (error) {
+      setEEAnalysisError(error instanceof Error ? error.message : "Failed to run EE analysis");
+    } finally {
+      setEEAnalyzing(false);
+    }
+  };
 
   const handleIncompatibleFieldsAnalysis = async () => {
     setIncompatibleFieldsAnalyzing(true);
@@ -130,8 +170,8 @@ export default function DashboardPage() {
       // Debug logging
       console.log('Analysis data:', analysisData);
       console.log('Latest analysis:', latestAnalysis);
-      console.log('Source connection ID:', sourceConnectionId);
-      console.log('Target connection ID:', targetConnectionId);
+      console.log('Source connection Name:', sourceConnectionName);
+      console.log('Target connection Name:', targetConnectionName);
       console.log('Table details:', latestAnalysis?.comparison?.tableDetails);
 
       // Detailed error checking
@@ -153,7 +193,7 @@ export default function DashboardPage() {
         return;
       }
 
-      if (!sourceConnectionId || !targetConnectionId) {
+      if (!sourceConnectionName || !targetConnectionName) {
         setIncompatibleFieldsError("Database connections are not configured. Please set up connections in the Setup tab.");
         setIncompatibleFieldsAnalyzing(false);
         return;
@@ -175,8 +215,8 @@ export default function DashboardPage() {
 
       // Call the API
       const params = new URLSearchParams({
-        sourceId: String(sourceConnectionId),
-        targetId: String(targetConnectionId),
+        sourceName: String(sourceConnectionName),
+        targetName: String(targetConnectionName),
         incompatibleTables: JSON.stringify(incompatibleTables),
       });
       const response = await fetch(`/api/deep-analysis/incompatible-fields?${params.toString()}`);
@@ -231,8 +271,14 @@ export default function DashboardPage() {
           console.log("Source connection:", sourceConn);
           console.log("Target connection:", targetConn);
           
-          if (sourceConn) setSourceConnectionId(sourceConn.id);
-          if (targetConn) setTargetConnectionId(targetConn.id);
+          if (sourceConn) {
+            setSourceConnectionId(sourceConn.id);
+            setSourceConnectionName(sourceConn.name);
+          }
+          if (targetConn) {
+            setTargetConnectionId(targetConn.id);
+            setTargetConnectionName(targetConn.name);
+          }
         }
       } catch (error) {
         console.error("Failed to load connection IDs:", error);
@@ -347,9 +393,10 @@ export default function DashboardPage() {
 
           {/* Migration Workflow Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="setup">Setup</TabsTrigger>
               <TabsTrigger value="deep-analysis">Deep Analysis</TabsTrigger>
+              <TabsTrigger value="ee-analysis">EE Analysis</TabsTrigger>
               <TabsTrigger value="export">Export</TabsTrigger>
               <TabsTrigger value="migrate">Migrate</TabsTrigger>
               <TabsTrigger value="validate">Validate</TabsTrigger>
@@ -818,6 +865,66 @@ export default function DashboardPage() {
 
               {recordAnalysisResult && (
                 <RecordAnalysisView analysis={recordAnalysisResult} />
+              )}
+            </TabsContent>
+
+            {/* EE Analysis Tab */}
+            <TabsContent value="ee-analysis" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Enterprise Edition Incompatibility Analysis</CardTitle>
+                  <CardDescription>
+                    Analyze EE-specific data that will become incompatible when migrating to CE
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      ⚠️ <strong>Important:</strong> This analysis identifies records in your EE database that use EE-only features. These records may lose functionality or data during migration to CE.
+                    </AlertDescription>
+                  </Alert>
+
+                  {!sourceConnectionId && (
+                    <Alert>
+                      <AlertDescription>
+                        Please configure the source database connection in the Setup tab first.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button
+                    onClick={handleEEAnalysis}
+                    disabled={eeAnalyzing || !sourceConnectionId}
+                    className="w-full"
+                  >
+                    {eeAnalyzing ? "Analyzing..." : "Run EE Incompatibility Analysis"}
+                  </Button>
+
+                  {eeAnalysisError && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{eeAnalysisError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {eeAnalyzing && (
+                    <div className="text-center space-y-2 py-8">
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Connecting to source database...
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Executing incompatibility detection queries...
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        ⏳ Analyzing record-level incompatibilities...
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {eeAnalysisResult && (
+                <EEAnalysisView summary={eeAnalysisResult} loading={eeAnalyzing} />
               )}
             </TabsContent>
 

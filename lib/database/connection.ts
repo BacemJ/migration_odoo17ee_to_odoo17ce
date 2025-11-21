@@ -239,13 +239,36 @@ export async function getConnectionConfig(
   }
 
   const conn = result[0];
-  const password = decryptPassword(conn.encrypted_password);
-
   return {
     host: conn.host,
     port: conn.port,
     database: conn.database,
     user: conn.username,
-    password: password,
+    password: conn.encrypted_password,
+  };
+}
+
+/**
+ * Get database connection configuration by name (plain password)
+ */
+export async function getConnectionConfigByName(name: string): Promise<PoolConfig> {
+  const pool = getConfigPool();
+  const result = await executeQuery<DatabaseConnection>(
+    pool,
+    'SELECT * FROM database_connections WHERE name = $1',
+    [name]
+  );
+
+  if (result.length === 0) {
+    throw new Error(`Connection with name ${name} not found`);
+  }
+
+  const conn = result[0];
+  return {
+    host: conn.host,
+    port: conn.port,
+    database: conn.database,
+    user: conn.username,
+    password: conn.encrypted_password,
   };
 }

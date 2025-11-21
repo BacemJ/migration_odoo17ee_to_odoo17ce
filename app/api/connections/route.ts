@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Save connection
+    // Save (create or upsert-by-name / update-by-id) connection
     const connection = await saveConnection({
       id: id ? parseInt(id) : undefined,
       name,
@@ -88,10 +88,17 @@ export async function POST(request: Request) {
         ...connection,
         serverVersion: testResult.serverVersion,
       },
-      message: id ? 'Connection updated successfully' : 'Connection created successfully',
+      message: id ? 'Connection updated successfully' : (connection ? 'Connection upserted successfully (by name)' : 'Connection created successfully'),
     });
   } catch (error) {
     console.error('Error saving connection:', error);
+    // Friendly duplicate handling (should be covered by upsert, but fallback if error surfaces)
+    if (error instanceof Error && /duplicate key value violates unique constraint/.test(error.message)) {
+      return NextResponse.json(
+        { success: false, error: 'A connection with this name already exists. It was not updated because an ID was not supplied.' },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       {
         success: false,
