@@ -924,7 +924,7 @@ export default function DashboardPage() {
               </Card>
 
               {eeAnalysisResult && (
-                <EEAnalysisView summary={eeAnalysisResult} loading={eeAnalyzing} />
+                <EEAnalysisView summary={eeAnalysisResult} loading={eeAnalyzing} sourceConnectionName={sourceConnectionName || undefined} />
               )}
             </TabsContent>
 

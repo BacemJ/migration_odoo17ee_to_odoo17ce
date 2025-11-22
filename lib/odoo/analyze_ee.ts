@@ -165,4 +165,35 @@ export async function getIncompatibilitySummary(pool: Pool): Promise<{
   return summary;
 }
 
+/**
+ * Fetch sample incompatible records for a given table using its detection method
+ * @param pool PostgreSQL connection pool
+ * @param tableName Fully qualified table name (e.g., 'public.ir_module_module')
+ * @param limit Maximum number of records to return
+ * @returns Object containing records, columns and total incompatible count
+ */
+export async function getIncompatibleRecords(
+  pool: Pool,
+  tableName: string,
+  limit: number = 50
+): Promise<{ records: Record<string, unknown>[]; columns: string[]; totalIncompatible: number }> {
+  const definition = getScanTable(tableName);
+  if (!definition || !definition.incompatibility_detection_method) {
+    throw new Error(`No incompatibility detection method defined for table ${tableName}`);
+  }
+
+  // Count total incompatible records
+  const countQuery = `SELECT COUNT(*) as count FROM (${definition.incompatibility_detection_method}) AS subset`;
+  const countResult = await pool.query(countQuery);
+  const totalIncompatible = parseInt(countResult.rows[0].count, 10);
+
+  // Fetch limited incompatible records
+  const limitedQuery = `SELECT * FROM (${definition.incompatibility_detection_method}) AS subset LIMIT $1`;
+  const recordsResult = await pool.query(limitedQuery, [limit]);
+  const records: Record<string, unknown>[] = recordsResult.rows;
+  const columns = records.length > 0 ? Object.keys(records[0]) : [];
+
+  return { records, columns, totalIncompatible };
+}
+
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -31,6 +31,7 @@ interface EEAnalysisSummary {
 interface EEAnalysisViewProps {
   summary: EEAnalysisSummary;
   loading?: boolean;
+  sourceConnectionName?: string;
 }
 
 const getRiskLevelColor = (riskLevel: string) => {
@@ -63,7 +64,41 @@ const getRiskLevelIcon = (riskLevel: string) => {
   }
 };
 
-export function EEAnalysisView({ summary, loading }: EEAnalysisViewProps) {
+export function EEAnalysisView({ summary, loading, sourceConnectionName }: EEAnalysisViewProps) {
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [recordsData, setRecordsData] = useState<{
+    tableName: string;
+    totalIncompatible: number;
+    returned: number;
+    columns: string[];
+    records: Record<string, unknown>[];
+  } | null>(null);
+  const [openTable, setOpenTable] = useState<string | null>(null);
+
+  const loadIncompatibleRecords = async (tableName: string) => {
+    setOpenTable(tableName);
+    setRecordsLoading(true);
+    setRecordsError(null);
+    setRecordsData(null);
+    try {
+      const res = await fetch('/api/ee-analysis/table', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionName: sourceConnectionName, tableName, limit: 50 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRecordsData(data.data);
+      } else {
+        setRecordsError(data.error || 'Failed to load incompatible records');
+      }
+    } catch (err) {
+      setRecordsError(err instanceof Error ? err.message : 'Failed to load incompatible records');
+    } finally {
+      setRecordsLoading(false);
+    }
+  };
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -202,6 +237,7 @@ export function EEAnalysisView({ summary, loading }: EEAnalysisViewProps) {
                     <TableHead className="text-right">Incompatible</TableHead>
                     <TableHead className="text-right">Impact %</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -242,6 +278,18 @@ export function EEAnalysisView({ summary, loading }: EEAnalysisViewProps) {
                           <Badge variant="outline">No Detection</Badge>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {result.hasDetectionMethod && result.incompatibleRecords > 0 && sourceConnectionName ? (
+                          <button
+                            onClick={() => loadIncompatibleRecords(result.tableName)}
+                            className="text-xs px-2 py-1 rounded border bg-muted hover:bg-accent transition"
+                          >
+                            View Records
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -272,6 +320,88 @@ export function EEAnalysisView({ summary, loading }: EEAnalysisViewProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Incompatible Records Modal */}
+      {openTable && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-5xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h2 className="font-semibold text-lg">Incompatible Records: {openTable.replace('public.', '')}</h2>
+                {recordsData && (
+                  <p className="text-sm text-muted-foreground">
+                    Showing {recordsData.returned} of {recordsData.totalIncompatible.toLocaleString()} incompatible rows
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => { setOpenTable(null); setRecordsData(null); setRecordsError(null); }}
+                className="rounded px-2 py-1 text-sm hover:bg-muted"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex-1">
+              {recordsLoading && (
+                <div className="text-center py-10 text-sm text-muted-foreground">Loading incompatible records...</div>
+              )}
+              {recordsError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{recordsError}</AlertDescription>
+                </Alert>
+              )}
+              {recordsData && recordsData.records.length === 0 && !recordsLoading && (
+                <div className="text-center py-10 text-sm text-muted-foreground">No incompatible records found.</div>
+              )}
+              {recordsData && recordsData.records.length > 0 && (
+                <div className="border rounded">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {recordsData.columns.map(col => (
+                          <TableHead key={col} className="font-mono text-xs">{col}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recordsData.records.map((row, idx) => (
+                        <TableRow key={idx}>
+                          {recordsData.columns.map(col => (
+                            <TableCell key={col} className="font-mono text-xs whitespace-nowrap max-w-60 overflow-hidden text-ellipsis">
+                              {row[col] === null || row[col] === undefined ? '' : String(row[col])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t flex justify-between items-center gap-2">
+              <div className="text-xs text-muted-foreground">
+                {recordsData && recordsData.totalIncompatible > recordsData.returned && 'Display limited to first 50 rows.'}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => loadIncompatibleRecords(openTable)}
+                  disabled={recordsLoading}
+                  className="text-xs px-3 py-1 rounded border bg-muted hover:bg-accent disabled:opacity-50"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={() => { setOpenTable(null); setRecordsData(null); setRecordsError(null); }}
+                  className="text-xs px-3 py-1 rounded border bg-destructive text-white hover:brightness-110"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
