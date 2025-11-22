@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
 import ConnectionForm from "@/components/migration-wizard/ConnectionForm";
 
@@ -123,6 +124,42 @@ export default function DashboardPage() {
   const [eeAnalyzing, setEEAnalyzing] = useState(false);
   const [eeAnalysisResult, setEEAnalysisResult] = useState<any>(null);
   const [eeAnalysisError, setEEAnalysisError] = useState<string | null>(null);
+
+  // Full Analyze - View Records Modal state
+  const [fullAnalyzeRecordsLoading, setFullAnalyzeRecordsLoading] = useState(false);
+  const [fullAnalyzeRecordsError, setFullAnalyzeRecordsError] = useState<string | null>(null);
+  const [fullAnalyzeRecordsData, setFullAnalyzeRecordsData] = useState<{
+    tableName: string;
+    totalIncompatible: number;
+    returned: number;
+    columns: string[];
+    records: Record<string, unknown>[];
+  } | null>(null);
+  const [fullAnalyzeOpenTable, setFullAnalyzeOpenTable] = useState<string | null>(null);
+
+  const loadFullAnalyzeIncompatibleRecords = async (tableName: string) => {
+    setFullAnalyzeOpenTable(tableName);
+    setFullAnalyzeRecordsLoading(true);
+    setFullAnalyzeRecordsError(null);
+    setFullAnalyzeRecordsData(null);
+    try {
+      const res = await fetch('/api/ee-analysis/table', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionName: sourceConnectionName, tableName, limit: 50 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFullAnalyzeRecordsData(data.data);
+      } else {
+        setFullAnalyzeRecordsError(data.error || 'Failed to load incompatible records');
+      }
+    } catch (err) {
+      setFullAnalyzeRecordsError(err instanceof Error ? err.message : 'Failed to load incompatible records');
+    } finally {
+      setFullAnalyzeRecordsLoading(false);
+    }
+  };
 
   const handleEEAnalysis = async () => {
     setEEAnalyzing(true);
@@ -393,13 +430,11 @@ export default function DashboardPage() {
 
           {/* Migration Workflow Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="setup">Setup</TabsTrigger>
               <TabsTrigger value="deep-analysis">Deep Analysis</TabsTrigger>
               <TabsTrigger value="ee-analysis">EE Analysis</TabsTrigger>
-              <TabsTrigger value="export">Export</TabsTrigger>
-              <TabsTrigger value="migrate">Migrate</TabsTrigger>
-              <TabsTrigger value="validate">Validate</TabsTrigger>
+              <TabsTrigger value="full-analyze">Full Analyze</TabsTrigger>
             </TabsList>
 
             {/* Setup Tab */}
@@ -807,64 +842,509 @@ export default function DashboardPage() {
 
             </TabsContent>
 
-            {/* Export Tab */}
-            <TabsContent value="export" className="space-y-6">
+            {/* Full Analyze Tab */}
+            <TabsContent value="full-analyze" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Record Compatibility Analysis</CardTitle>
+                  <CardTitle>Comprehensive Migration Analysis</CardTitle>
                   <CardDescription>
-                    Analyze tables with differences to identify CE-compatible vs EE-only records
+                    Complete analysis combining all migration checks, data loss assessment, and compatibility reports
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Alert>
                     <AlertDescription>
-                      This analysis examines tables with compatible and incompatible differences to determine which records can be migrated to Odoo CE and which contain EE-only data.
+                      This performs a full analysis combining table comparison, missing tables detection, incompatible fields analysis, EE-specific features detection, and record-level compatibility checks.
                     </AlertDescription>
                   </Alert>
 
-                  <Button 
-                    onClick={handleRecordAnalysis} 
-                    disabled={recordAnalyzing || !analysisResult}
-                    className="w-full"
-                  >
-                    {recordAnalyzing ? "Analyzing records..." : "Analyze Record Compatibility"}
-                  </Button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Button 
+                      onClick={handleAnalyze} 
+                      disabled={analyzing}
+                      className="w-full"
+                    >
+                      {analyzing ? "Analyzing..." : "1. Run Table Comparison"}
+                    </Button>
 
-                  {!analysisResult && (
-                    <Alert>
-                      <AlertDescription>
-                        Please run the table comparison analysis first (Setup tab).
-                      </AlertDescription>
-                    </Alert>
+                    <Button 
+                      onClick={handleMissingTablesAnalysis} 
+                      disabled={missingTablesAnalyzing || !analysisResult}
+                      className="w-full"
+                    >
+                      {missingTablesAnalyzing ? "Analyzing..." : "2. Analyze Missing Tables"}
+                    </Button>
+
+                    <Button 
+                      onClick={handleIncompatibleFieldsAnalysis} 
+                      disabled={incompatibleFieldsAnalyzing || !analysisResult}
+                      className="w-full"
+                    >
+                      {incompatibleFieldsAnalyzing ? "Analyzing..." : "3. Analyze Incompatible Fields"}
+                    </Button>
+
+                    <Button 
+                      onClick={handleEEAnalysis} 
+                      disabled={eeAnalyzing || !sourceConnectionName}
+                      className="w-full"
+                    >
+                      {eeAnalyzing ? "Analyzing..." : "4. Run EE Analysis"}
+                    </Button>
+
+                    <Button 
+                      onClick={handleRecordAnalysis} 
+                      disabled={recordAnalyzing || !analysisResult}
+                      className="w-full"
+                    >
+                      {recordAnalyzing ? "Analyzing..." : "5. Analyze Record Compatibility"}
+                    </Button>
+                  </div>
+
+                  {(analyzing || missingTablesAnalyzing || incompatibleFieldsAnalyzing || eeAnalyzing || recordAnalyzing) && (
+                    <div className="text-center py-6">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                      <p className="text-sm text-muted-foreground">Running comprehensive analysis...</p>
+                    </div>
                   )}
 
-                  {recordAnalysisError && (
+                  {(analysisError || missingTablesError || incompatibleFieldsError || eeAnalysisError || recordAnalysisError) && (
                     <Alert variant="destructive">
                       <AlertDescription>
-                        ❌ {recordAnalysisError}
+                        {analysisError || missingTablesError || incompatibleFieldsError || eeAnalysisError || recordAnalysisError}
                       </AlertDescription>
                     </Alert>
-                  )}
-
-                  {recordAnalyzing && (
-                    <div className="text-center space-y-2 py-8">
-                      <div className="text-sm text-muted-foreground">
-                        ⏳ Analyzing compatible tables...
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        ⏳ Analyzing incompatible tables...
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        ⏳ Identifying EE-only records...
-                      </div>
-                    </div>
                   )}
                 </CardContent>
               </Card>
 
-              {recordAnalysisResult && (
-                <RecordAnalysisView analysis={recordAnalysisResult} />
+              {/* Merged: Incompatible Fields + EE Analysis */}
+              {incompatibleFieldsResult && (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>📋 Incompatible Tables - Comprehensive Analysis</CardTitle>
+                      <CardDescription>
+                        Combined view: Field-level data loss analysis + EE-specific feature incompatibilities
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Alert className="mb-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          This section shows tables with incompatible differences, merging field-level analysis with EE-specific incompatibilities detected.
+                        </AlertDescription>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+
+                  {/* Show each incompatible table with merged data */}
+                  {incompatibleFieldsResult.analysis.map((table, idx) => {
+                    const eeTableData = eeAnalysisResult?.results?.find(
+                      (r: { tableName: string }) => r.tableName === `public.${table.tableName}` || r.tableName === table.tableName
+                    );
+
+                    return (
+                      <Card key={idx} className="border-l-4 border-l-red-500">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-lg font-mono">{table.tableName}</CardTitle>
+                              <CardDescription className="mt-1">{table.dataType.description}</CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge variant={
+                                table.dataType.category === 'business_data' ? 'destructive' :
+                                table.dataType.category === 'application_configuration' ? 'default' :
+                                'secondary'
+                              }>
+                                {table.dataType.category.replace('_', ' ')}
+                              </Badge>
+                              {eeTableData && eeTableData.incompatibleRecords > 0 && sourceConnectionName && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => loadFullAnalyzeIncompatibleRecords(eeTableData.tableName)}
+                                >
+                                  View EE Records
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Field-Level Data Loss */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-red-50 border border-red-200 rounded">
+                            <div>
+                              <div className="text-sm text-muted-foreground">Total Records</div>
+                              <div className="text-2xl font-bold">{table.totalRecordsInTable.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-muted-foreground">Records with Data Loss</div>
+                              <div className="text-2xl font-bold text-red-700">{table.recordsWithDataLoss.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-muted-foreground">Missing Columns</div>
+                              <div className="text-2xl font-bold text-red-700">{table.missingColumns.length}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-muted-foreground">Impact</div>
+                              <div className="text-2xl font-bold text-red-700">
+                                {((table.recordsWithDataLoss / table.totalRecordsInTable) * 100).toFixed(1)}%
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* EE Analysis Data (if available) */}
+                          {eeTableData && (
+                            <div className="p-4 bg-purple-50 border border-purple-200 rounded">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="text-sm font-semibold text-purple-900">
+                                  🔍 EE-Specific Features Analysis
+                                </div>
+                                {eeTableData.incompatibleRecords > 0 && sourceConnectionName && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => loadFullAnalyzeIncompatibleRecords(eeTableData.tableName)}
+                                    className="text-xs"
+                                  >
+                                    View Records
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                  <div className="text-xs text-muted-foreground">EE Incompatible Records</div>
+                                  <div className="text-xl font-bold text-purple-900">{eeTableData.incompatibleRecords?.toLocaleString() || 0}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground">EE Impact</div>
+                                  <div className="text-xl font-bold text-purple-900">{eeTableData.percentageIncompatible?.toFixed(1) || 0}%</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground">Risk Level</div>
+                                  <div className={`text-lg font-bold uppercase ${
+                                    eeTableData.riskLevel === 'critical' ? 'text-red-600' :
+                                    eeTableData.riskLevel === 'high' ? 'text-orange-600' :
+                                    eeTableData.riskLevel === 'medium' ? 'text-yellow-600' :
+                                    'text-blue-600'
+                                  }`}>{eeTableData.riskLevel || 'N/A'}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground">Table Role</div>
+                                  <div className="text-lg font-bold capitalize">{eeTableData.tableRole || 'N/A'}</div>
+                                </div>
+                              </div>
+                              {eeTableData.migrationAction && (
+                                <div className="mt-3 p-2 bg-purple-100 rounded text-sm">
+                                  <span className="font-semibold">Migration Action:</span>
+                                  <span className="ml-2">{eeTableData.migrationAction}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Missing Columns Details */}
+                          <div>
+                            <div className="text-sm font-semibold mb-2">Missing Columns in CE:</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {table.missingColumns.map((col, colIdx) => (
+                                <div key={colIdx} className="p-3 bg-white border rounded">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-mono text-sm font-bold">{col.columnName}</span>
+                                    <Badge variant={col.isBusinessCritical ? 'destructive' : 'secondary'} className="text-xs">
+                                      {col.isBusinessCritical ? 'Critical' : col.dataType}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {col.recordsWithData.toLocaleString()} records affected
+                                  </div>
+                                  {col.sampleValues && col.sampleValues.length > 0 && (
+                                    <div className="mt-2 text-xs">
+                                      <span className="text-muted-foreground">Sample: </span>
+                                      <span className="font-mono">{String(col.sampleValues[0])}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Sample Records */}
+                          {table.sampleRecords && table.sampleRecords.length > 0 && (
+                            <details className="group">
+                              <summary className="cursor-pointer p-3 bg-gray-50 rounded hover:bg-gray-100 font-semibold text-sm">
+                                View Sample Records ({table.sampleRecords.length})
+                              </summary>
+                              <div className="mt-2 overflow-x-auto border rounded">
+                                <table className="w-full text-xs">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      {Object.keys(table.sampleRecords[0])
+                                        .filter(key => key !== '_missingInCE')
+                                        .map((key, i) => (
+                                          <th key={i} className="p-2 text-left font-mono border-b">
+                                            <span className={
+                                              table.sampleRecords[0]._missingInCE?.includes(key) 
+                                                ? 'text-red-600 font-bold' 
+                                                : ''
+                                            }>
+                                              {key}
+                                            </span>
+                                          </th>
+                                        ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {table.sampleRecords.slice(0, 5).map((record, rIdx) => (
+                                      <tr key={rIdx} className="hover:bg-gray-50">
+                                        {Object.entries(record)
+                                          .filter(([key]) => key !== '_missingInCE')
+                                          .map(([key, value], cIdx) => (
+                                            <td 
+                                              key={cIdx} 
+                                              className={`p-2 border-b font-mono ${
+                                                record._missingInCE?.includes(key)
+                                                  ? 'bg-red-50 text-red-800 font-bold border-l-2 border-l-red-500'
+                                                  : ''
+                                              }`}
+                                            >
+                                              {value === null || value === undefined ? (
+                                                <span className="text-gray-400 italic">null</span>
+                                              ) : (
+                                                String(value).substring(0, 50)
+                                              )}
+                                            </td>
+                                          ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </details>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </>
+              )}
+
+              {recordAnalysisResult && recordAnalysisResult.compatibleDiffTables && recordAnalysisResult.compatibleDiffTables.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Tables with Compatible Differences</CardTitle>
+                    <CardDescription>
+                      Tables that exist in both EE and CE but have structural differences - enhanced with EE-specific data analysis
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {recordAnalysisResult.compatibleDiffTables.map((table, idx) => {
+                        // Find matching EE analysis data for this table
+                        const eeTableData = eeAnalysisResult?.results?.find(
+                          (r: { tableName: string }) => r.tableName === `public.${table.tableName}` || r.tableName === table.tableName
+                        );
+                        
+                        return (
+                          <Card key={idx} className="border-l-4 border-l-blue-500">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg font-mono">{table.tableName}</CardTitle>
+                                <div className="flex gap-2">
+                                  {table.percentageCompatible >= 90 ? (
+                                    <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">High Compatibility</span>
+                                  ) : table.percentageCompatible >= 70 ? (
+                                    <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Medium Compatibility</span>
+                                  ) : (
+                                    <span className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded">Low Compatibility</span>
+                                  )}
+                                  {eeTableData && eeTableData.incompatibleRecords > 0 && sourceConnectionName && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => loadFullAnalyzeIncompatibleRecords(eeTableData.tableName)}
+                                    >
+                                      View EE Records
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                <div className="text-center p-3 bg-gray-50 rounded">
+                                  <div className="text-xl font-bold">{table.totalRecords.toLocaleString()}</div>
+                                  <div className="text-xs text-muted-foreground">Total Records</div>
+                                </div>
+                                <div className="text-center p-3 bg-green-50 rounded">
+                                  <div className="text-xl font-bold text-green-700">{table.ceCompatibleRecords.toLocaleString()}</div>
+                                  <div className="text-xs text-muted-foreground">CE Compatible</div>
+                                </div>
+                                <div className="text-center p-3 bg-red-50 rounded">
+                                  <div className="text-xl font-bold text-red-700">{table.eeOnlyRecords.toLocaleString()}</div>
+                                  <div className="text-xs text-muted-foreground">EE Only</div>
+                                </div>
+                                <div className="text-center p-3 bg-blue-50 rounded">
+                                  <div className="text-xl font-bold text-blue-700">{table.percentageCompatible.toFixed(1)}%</div>
+                                  <div className="text-xs text-muted-foreground">Compatible</div>
+                                </div>
+                              </div>
+
+                              {eeTableData && (
+                                <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-sm font-semibold text-purple-900">🔍 EE-Specific Features Detected</div>
+                                    {eeTableData.incompatibleRecords > 0 && sourceConnectionName && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => loadFullAnalyzeIncompatibleRecords(eeTableData.tableName)}
+                                        className="text-xs h-7"
+                                      >
+                                        View Records
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                    <div>
+                                      <span className="text-muted-foreground">Incompatible Records:</span>
+                                      <span className="ml-2 font-bold text-destructive">{eeTableData.incompatibleRecords?.toLocaleString() || 0}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Impact:</span>
+                                      <span className="ml-2 font-bold">{eeTableData.percentageIncompatible?.toFixed(1) || 0}%</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Risk Level:</span>
+                                      <span className={`ml-2 font-bold uppercase ${
+                                        eeTableData.riskLevel === 'critical' ? 'text-red-600' :
+                                        eeTableData.riskLevel === 'high' ? 'text-orange-600' :
+                                        eeTableData.riskLevel === 'medium' ? 'text-yellow-600' :
+                                        'text-blue-600'
+                                      }`}>{eeTableData.riskLevel || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Table Role:</span>
+                                      <span className="ml-2 font-bold capitalize">{eeTableData.tableRole || 'N/A'}</span>
+                                    </div>
+                                  </div>
+                                  {eeTableData.migrationAction && (
+                                    <div className="mt-2 text-xs">
+                                      <span className="text-muted-foreground">Migration Action:</span>
+                                      <span className="ml-2 italic">{eeTableData.migrationAction}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {table.missingColumns && table.missingColumns.length > 0 && (
+                                <div className="mt-3">
+                                  <div className="text-sm font-semibold mb-1">Missing Columns in CE:</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {table.missingColumns.map((col: string, colIdx: number) => (
+                                      <span key={colIdx} className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded font-mono">
+                                        {col}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Incompatible Records Modal for Full Analyze */}
+              {fullAnalyzeOpenTable && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+                  <div className="bg-background rounded-lg border shadow-lg w-full max-w-5xl max-h-[80vh] flex flex-col">
+                    <div className="flex items-center justify-between p-4 border-b">
+                      <div>
+                        <h2 className="font-semibold text-lg">EE Incompatible Records: {fullAnalyzeOpenTable.replace('public.', '')}</h2>
+                        {fullAnalyzeRecordsData && (
+                          <p className="text-sm text-muted-foreground">
+                            Showing {fullAnalyzeRecordsData.returned} of {fullAnalyzeRecordsData.totalIncompatible.toLocaleString()} incompatible rows
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => { setFullAnalyzeOpenTable(null); setFullAnalyzeRecordsData(null); setFullAnalyzeRecordsError(null); }}
+                        className="rounded px-2 py-1 text-sm hover:bg-muted"
+                        aria-label="Close"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="p-4 overflow-auto flex-1">
+                      {fullAnalyzeRecordsLoading && (
+                        <div className="text-center py-10 text-sm text-muted-foreground">Loading incompatible records...</div>
+                      )}
+                      {fullAnalyzeRecordsError && (
+                        <Alert variant="destructive" className="mb-4">
+                          <AlertDescription>{fullAnalyzeRecordsError}</AlertDescription>
+                        </Alert>
+                      )}
+                      {fullAnalyzeRecordsData && fullAnalyzeRecordsData.records.length === 0 && !fullAnalyzeRecordsLoading && (
+                        <div className="text-center py-10 text-sm text-muted-foreground">No incompatible records found.</div>
+                      )}
+                      {fullAnalyzeRecordsData && fullAnalyzeRecordsData.records.length > 0 && (
+                        <div className="border rounded overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                {fullAnalyzeRecordsData.columns.map(col => (
+                                  <th key={col} className="p-2 text-left font-mono border-b whitespace-nowrap">{col}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {fullAnalyzeRecordsData.records.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  {fullAnalyzeRecordsData.columns.map(col => (
+                                    <td key={col} className="p-2 font-mono border-b whitespace-nowrap max-w-60 overflow-hidden text-ellipsis">
+                                      {row[col] === null || row[col] === undefined ? (
+                                        <span className="text-gray-400 italic">null</span>
+                                      ) : (
+                                        String(row[col])
+                                      )}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4 border-t flex justify-between items-center gap-2">
+                      <div className="text-xs text-muted-foreground">
+                        {fullAnalyzeRecordsData && fullAnalyzeRecordsData.totalIncompatible > fullAnalyzeRecordsData.returned && 'Display limited to first 50 rows.'}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => loadFullAnalyzeIncompatibleRecords(fullAnalyzeOpenTable)}
+                          disabled={fullAnalyzeRecordsLoading}
+                        >
+                          Refresh
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => { setFullAnalyzeOpenTable(null); setFullAnalyzeRecordsData(null); setFullAnalyzeRecordsError(null); }}
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </TabsContent>
 
@@ -928,43 +1408,7 @@ export default function DashboardPage() {
               )}
             </TabsContent>
 
-            {/* Migrate Tab */}
-            <TabsContent value="migrate" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Migration Execution</CardTitle>
-                  <CardDescription>
-                    Execute migration on staging database
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Alert>
-                    <AlertDescription>
-                      Migration interface coming soon. This will allow you to run migration in dry-run mode or execute on staging database.
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
-            {/* Validate Tab */}
-            <TabsContent value="validate" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Validation Results</CardTitle>
-                  <CardDescription>
-                    Post-migration validation checks
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Alert>
-                    <AlertDescription>
-                      Validation interface coming soon. This will display validation check results and migration status.
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         </div>
       </div>
