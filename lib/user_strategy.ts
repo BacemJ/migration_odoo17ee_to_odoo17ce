@@ -1,0 +1,18 @@
+const migStart = {
+    product_template: 'overwrite target data by source data',
+    account_move: 'overwrite target data by source data',
+    pos_order: 'overwrite target data by source data',
+    sale_order_line: 'overwrite target data by source data',
+    res_partner: 'overwrite target data by source data',
+    product_product: 'overwrite target data by source data',
+    sale_order:'overwrite target data by source data',
+    ir_model_data: 'Keep target data, do not migrate from source',
+    purchase_order: 'overwrite target data by source data',
+    stock_picking_type: 'overwrite target data by source data',
+    product_attribute: 'overwrite target data by source data',
+    payment_provider: 'Keep target data, do not migrate from source',
+    res_company: 'overwrite target data by source data',
+    res_config_settings: 'Keep target data, do not migrate from source',
+    pos_config: 'Keep target data, do not migrate from source',
+}
+export default migStart;
